@@ -113,7 +113,7 @@ def create_dense_model(vectoriser):
     Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), #Embedding creates a sequence of vectors for each sample
     GlobalAveragePooling1D(), # Pooling limits each sample to one vector.
     Dense(units=64, activation="relu"),
-    Dropout(0.2)
+    Dropout(0.2),
     Dense(units=1, activation="sigmoid")
     ])
 
@@ -125,34 +125,31 @@ def compile_model(model, optimiser="adam", loss="binary_crossentropy", metrics=[
     )
 
 def create_gru_model(vectoriser):
-    model = keras.Sequential([
+    return keras.Sequential([
         vectoriser,
         Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), # No pooling needed here due to GRU already being a sequence reducer that reads word vectors one by one.
         GRU(64, dropout=0.2),
-        Dropout(0.2)
+        Dropout(0.2),
         Dense(1, activation="sigmoid")
     ])
-    compile_model(model)
 
 def create_lstm_model(vectoriser):
-    model = keras.Sequential([
+    return keras.Sequential([
         vectoriser,
         Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), # No pooling needed here due to GRU already being a sequence reducer that reads word vectors one by one.
         Bidirectional(LSTM(64, dropout=0.2)),
-        Dropout(0.2)
+        Dropout(0.2),
         Dense(1, activation="sigmoid")
     ])
-    compile_model(model)
 
 def create_cnn_model(vectoriser):
-    model = keras.Sequential([
+    return keras.Sequential([
         vectoriser,
         Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim),
         Conv1D(filters=128, kernel_size=5, activation="relu"),
         GlobalMaxPooling1D(),
         Dense(1, activation="sigmoid")
     ])
-    compile_model(model)
 
 def setup_early_stopping():
     return EarlyStopping(
@@ -179,15 +176,22 @@ def main():
 
     if args.neural_network_type == "BASIC":
         model = create_dense_model(vectoriser)
-
     elif args.neural_network_type == "GRU":
         model = create_gru_model(vectoriser)
-
-    elif args.neural_network_type == "gru":
+    elif args.neural_network_type == "LSTM":
         model = create_gru_model(vectoriser)
-
+    elif args.neural_network_type == "CNN":
+        model = create_cnn_model(vectoriser)
     
-    model.fit(x_train, y_train, epochs=args.epochs, batch_size=32)
+    compile_model(model)
+    
+    model.fit(
+        x_train,
+        y_train,
+        epochs=args.epochs,
+        batch_size=32,
+        callbacks=[setup_early_stopping()]
+    )
 
     if model is None:
         print(f"[ERROR] model is NULL, something went terribly wrong!")
