@@ -26,7 +26,7 @@
     <property name="height">200</property>
     <property name="width">200</property>
     <child>
-      <object class="tk.Text" id="text1">
+      <object class="tk.Text" id="reviewInput">
         <property name="height">10</property>
         <property name="width">50</property>
         <layout manager="grid">
@@ -39,7 +39,7 @@
       </object>
     </child>
     <child>
-      <object class="pygubu.widgets.PathChooserInput" id="pathchooserinput1">
+      <object class="pygubu.widgets.PathChooserInput" id="modelInput">
         <property name="defaultextension">.keras</property>
         <property name="textvariable">string:model_path</property>
         <layout manager="grid">
@@ -74,7 +74,7 @@
       </object>
     </child>
     <child>
-      <object class="ttk.Label" id="label2">
+      <object class="ttk.Label" id="resultLabel">
         <property name="text" translatable="yes">Result</property>
         <layout manager="grid">
           <property name="column">1</property>
