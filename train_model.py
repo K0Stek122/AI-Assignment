@@ -3,7 +3,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 from tensorflow import keras
 import tensorflow as tf
-from keras.layers import Embedding, Dense, LSTM, Dropout, Bidirectional, TextVectorization, GlobalAveragePooling1D, GRU
+from keras.layers import Embedding, Dense, LSTM, Dropout, Bidirectional, TextVectorization, GlobalAveragePooling1D, GRU, Conv1D, GlobalMaxPooling1D
 from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from pathlib import Path
@@ -110,21 +110,61 @@ def create_dense_model(vectoriser):
     #ReLU in the hidden layer to learn nonlinear features cheaply (avoids vanishing gradients), then a sigmoid on the final 1-unit layer to squash outputs for binary classification probability
     return keras.Sequential([
     vectoriser,
-    Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim),
-    GlobalAveragePooling1D(),
+    Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), #Embedding creates a sequence of vectors for each sample
+    GlobalAveragePooling1D(), # Pooling limits each sample to one vector.
     Dense(units=64, activation="relu"),
+    Dropout(0.2)
     Dense(units=1, activation="sigmoid")
     ])
 
+def compile_model(model, optimiser="adam", loss="binary_crossentropy", metrics=["accuracy"]):
+    model.compile(
+        optimizer=optimiser,
+        loss=loss,
+        metrics=metrics
+    )
+
 def create_gru_model(vectoriser):
-    return keras.Sequential([
+    model = keras.Sequential([
         vectoriser,
-        Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim),
-        GRU(64),
+        Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), # No pooling needed here due to GRU already being a sequence reducer that reads word vectors one by one.
+        GRU(64, dropout=0.2),
+        Dropout(0.2)
         Dense(1, activation="sigmoid")
     ])
+    compile_model(model)
+
+def create_lstm_model(vectoriser):
+    model = keras.Sequential([
+        vectoriser,
+        Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim), # No pooling needed here due to GRU already being a sequence reducer that reads word vectors one by one.
+        Bidirectional(LSTM(64, dropout=0.2)),
+        Dropout(0.2)
+        Dense(1, activation="sigmoid")
+    ])
+    compile_model(model)
+
+def create_cnn_model(vectoriser):
+    model = keras.Sequential([
+        vectoriser,
+        Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim),
+        Conv1D(filters=128, kernel_size=5, activation="relu"),
+        GlobalMaxPooling1D(),
+        Dense(1, activation="sigmoid")
+    ])
+    compile_model(model)
+
+def setup_early_stopping():
+    return EarlyStopping(
+        monitor='val_loss',
+        patience=2,
+        restore_best_weights=True
+    )
 
 def main():
+    global args
+    args = setup_arguments()
+    
     df = pd.read_csv(args.input)
     if df.empty:
         print(f"[ERROR] the provided dataset does not exist")
@@ -135,25 +175,26 @@ def main():
     vectoriser = setup_text_vectorisation()
     vectoriser.adapt(x_train)
 
+    model = None
+
     if args.neural_network_type == "BASIC":
-        
         model = create_dense_model(vectoriser)
-        model.compile(
-            optimizer='adam',
-            loss='binary_crossentropy',
-            metrics=['accuracy']
-        ) 
-        model.fit(x_train, y_train, epochs=args.epochs, batch_size=32)
-        model.save(args.output)
+
     elif args.neural_network_type == "GRU":
         model = create_gru_model(vectoriser)
-        model.compile(
-            optimizer='adam',
-            loss='binary_crossentropy',
-            metrics=['accuracy']
-        )
 
-args = setup_arguments()
+    elif args.neural_network_type == "gru":
+        model = create_gru_model(vectoriser)
+
+    
+    model.fit(x_train, y_train, epochs=args.epochs, batch_size=32)
+
+    if model is None:
+        print(f"[ERROR] model is NULL, something went terribly wrong!")
+        sys.exit(1)
+    else:
+        model.save(args.output)
+
 
 if __name__ == "__main__":
     main()
