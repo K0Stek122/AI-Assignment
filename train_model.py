@@ -12,33 +12,10 @@ import pandas as pd
 import numpy as np
 import argparse
 import sys
+from parser_types_util import type_csv, type_csv_nonreal, type_keras
 os.system("clear")
 
 # TODO - Add transformer if time permits
-
-def type_csv(value):
-    path = Path(value)
-    if not path.exists():
-        raise argparse.ArgumentTypeError("Provided CSV does not exist.")
-    if not path.is_file():
-        raise argparse.ArgumentTypeError("Provided CSV is not a file.")
-    if path.suffix.lower() != ".csv":
-        raise argparse.ArgumentTypeError("Provided CSV is not a CSV file.")
-    return path
-
-def type_csv_nonreal(value):
-    path = Path(value)
-    if not path.suffix.lower() != ".csv":
-        raise argparse.ArgumentTypeError("Provided CSV is not a CSV file.")
-    return path
-    
-def type_keras(value):
-    path = Path(value)
-    if not path.parent.exists():
-        raise argparse.ArgumentTypeError("Provided output path does not exist.")
-    if path.suffix.lower() != ".keras":
-        raise argparse.ArgumentTypeError("Output must end in .keras")
-    return path
 
 def setup_arguments():
     parser = argparse.ArgumentParser(prog="train_model", description="Train the model for recognising negative and positive reviews") 
@@ -96,12 +73,13 @@ def setup_arguments():
         '--neural-network-type',
         type=str.upper,
         choices=["DENSE", "LSTM", "GRU", "CNN"],
-        required=True)
+        required=True
+    )
     
     parser.add_argument(
         '-to',
         '--test-output',
-        type=type_csv_nonreal,
+        type=str,
         help="Outputs the test dataset to a specified CSV file. Otherwise discards test dataset."
     )
 
@@ -219,8 +197,8 @@ def main():
     
     if args.test_output:
         df = pd.DataFrame()
-        df["review"] = x_test
-        df["class"] = y_test
+        df["x_test"] = x_test
+        df["y_test"] = y_test
         df.to_csv(args.test_output)
 
     if model is None:
