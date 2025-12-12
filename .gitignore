@@ -1,3 +1,3 @@
 nltk_data/
-dataset/
 *.txt
+.vscode
