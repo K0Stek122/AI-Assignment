@@ -2,11 +2,12 @@ import pytest
 import sys
 from unittest.mock import patch
 from pathlib import Path
-from parse_data import *
 
 # Add root directory to path
 root_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(root_dir))
+
+from parse_data import *
 
 class TestParseData:
     def test_setup_arguments(self):
