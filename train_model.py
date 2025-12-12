@@ -3,7 +3,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 from tensorflow import keras
 import tensorflow as tf
-from keras.layers import Embedding, Dense, LSTM, Dropout, Bidirectional, TextVectorization, GlobalAveragePooling1D, GRU, Conv1D, GlobalMaxPooling1D
+from keras.layers import Embedding, Dense, LSTM, Dropout, Bidirectional, TextVectorization, GlobalAveragePooling1D, GRU, Conv1D, GlobalMaxPooling1D, Input, Concatenate
+from keras.models import Model
 from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from pathlib import Path
@@ -13,6 +14,8 @@ import argparse
 import sys
 os.system("clear")
 
+# TODO - Add transformer if time permits
+
 def type_csv(value):
     path = Path(value)
     if not path.exists():
@@ -20,6 +23,12 @@ def type_csv(value):
     if not path.is_file():
         raise argparse.ArgumentTypeError("Provided CSV is not a file.")
     if path.suffix.lower() != ".csv":
+        raise argparse.ArgumentTypeError("Provided CSV is not a CSV file.")
+    return path
+
+def type_csv_nonreal(value):
+    path = Path(value)
+    if not path.suffix.lower() != ".csv":
         raise argparse.ArgumentTypeError("Provided CSV is not a CSV file.")
     return path
     
@@ -86,8 +95,15 @@ def setup_arguments():
         '-nt',
         '--neural-network-type',
         type=str.upper,
-        choices=["BASIC", "LSTM", "GRU", "RNN", "FNN", "CNN", "RBFN", "SOM", "DBN", "GAN", "AE", "TRANSFORMER"],
+        choices=["DENSE", "LSTM", "GRU", "CNN"],
         required=True)
+    
+    parser.add_argument(
+        '-to',
+        '--test-output',
+        type=type_csv_nonreal,
+        help="Outputs the test dataset to a specified CSV file. Otherwise discards test dataset."
+    )
 
     return parser.parse_args()
 
@@ -117,13 +133,6 @@ def create_dense_model(vectoriser):
     Dense(units=1, activation="sigmoid")
     ])
 
-def compile_model(model, optimiser="adam", loss="binary_crossentropy", metrics=["accuracy"]):
-    model.compile(
-        optimizer=optimiser,
-        loss=loss,
-        metrics=metrics
-    )
-
 def create_gru_model(vectoriser):
     return keras.Sequential([
         vectoriser,
@@ -143,17 +152,28 @@ def create_lstm_model(vectoriser):
     ])
 
 def create_cnn_model(vectoriser):
-    return keras.Sequential([
-        vectoriser,
-        Embedding(input_dim=args.vocab_size, output_dim=args.embed_dim),
-        Conv1D(filters=128, kernel_size=5, activation="relu"),
-        GlobalMaxPooling1D(),
-        Dense(1, activation="sigmoid")
-    ])
+    # This model is built with a Functional API. That is, it parallelises training and trains...
+    # n-length bigrams simultaneously.
+    inputs = Input(shape=(1,), dtype="string")
+    x = vectoriser(inputs=inputs)
+    x = Embedding(args.vocab_size, args.embed_dim)(x)
+    conv_3 = Conv1D(args.embed_dim, 3, activation='relu')(x)
+    conv_3 = GlobalMaxPooling1D()(conv_3)
+    
+    conv_4 = Conv1D(args.embed_dim, 4, activation='relu')(x)
+    conv_4 = GlobalMaxPooling1D()(conv_4)
+
+    conv_5 = Conv1D(args.embed_dim, 5, activation='relu')(x)
+    conv_5 = GlobalMaxPooling1D()(conv_5)
+    
+    x = Concatenate()([conv_3, conv_4, conv_5])
+    outputs = Dense(1, activation="sigmoid")(x)
+    
+    return Model(inputs, outputs)
 
 def setup_early_stopping():
     return EarlyStopping(
-        monitor='val_loss',
+        monitor='accuracy',
         patience=2,
         restore_best_weights=True
     )
@@ -174,7 +194,7 @@ def main():
 
     model = None
 
-    if args.neural_network_type == "BASIC":
+    if args.neural_network_type == "DENSE":
         model = create_dense_model(vectoriser)
     elif args.neural_network_type == "GRU":
         model = create_gru_model(vectoriser)
@@ -183,7 +203,11 @@ def main():
     elif args.neural_network_type == "CNN":
         model = create_cnn_model(vectoriser)
     
-    compile_model(model)
+    model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
     
     model.fit(
         x_train,
@@ -192,6 +216,12 @@ def main():
         batch_size=32,
         callbacks=[setup_early_stopping()]
     )
+    
+    if args.test_output:
+        df = pd.DataFrame()
+        df["review"] = x_test
+        df["class"] = y_test
+        df.to_csv(args.test_output)
 
     if model is None:
         print(f"[ERROR] model is NULL, something went terribly wrong!")

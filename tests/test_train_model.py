@@ -71,3 +71,23 @@ class TestTrainModel:
         with patch.object(sys, 'argv', testargs):
             main()
         assert path.exists()
+
+    def test_cnn_model_training(self):
+        path = Path("trained_models/pytest_lstm_model.keras")
+        if path.exists():
+            os.remove(path)
+        testargs = [
+            "train_model.py",
+            "-o",
+            str(path),
+            "-i",
+            "dataset/TestReviews.csv",
+            "-nt",
+            "CNN",
+            "-e",
+            "1"
+        ]
+
+        with patch.object(sys, 'argv', testargs):
+            main()
+        assert path.exists()
